@@ -94,7 +94,6 @@ func Usage() {
 	fmt.Fprintf(os.Stderr, "\thttp://godoc.org/github.com/SOF3/go-stringer-inverse\n")
 	fmt.Fprintf(os.Stderr, "Flags:\n")
 	flag.PrintDefaults()
-	os.Exit(2)
 }
 
 func main() {
