@@ -586,8 +586,10 @@ func (g *Generator) buildOneRun(runs [][]Value, typeName string) {
 	}
 	if values[0].value == 0 { // Signed or unsigned, 0 is still 0.
 		g.Printf(stringOneRun, typeName, usize(len(values)), lessThanZero)
+		g.Printf(unstringOneRun, typeName, usize(len(values)), lessThanZero)
 	} else {
 		g.Printf(stringOneRunWithOffset, typeName, values[0].String(), usize(len(values)), lessThanZero)
+		g.Printf(unstringOneRunWithOffset, typeName, values[0].String(), usize(len(values)), lessThanZero)
 	}
 }
 
@@ -600,6 +602,16 @@ const stringOneRun = `func (i %[1]s) String() string {
 		return "%[1]s(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
 	return _%[1]s_name[_%[1]s_index[i]:_%[1]s_index[i+1]]
+}
+`
+
+const unstringOneRun = `func %[1]sValue(name string) %[1]s {
+	for _, i := range _%[1]s_index {
+		if name == _%[1]s_name[_%[1]s_index[i]:_%[1]s_index[i+1]] {
+			return %[1]s(i)
+		}
+	}
+	panic("not a constant of %[1]s")
 }
 `
 
@@ -618,6 +630,17 @@ const stringOneRunWithOffset = `func (i %[1]s) String() string {
 	return _%[1]s_name[_%[1]s_index[i] : _%[1]s_index[i+1]]
 }
 `
+
+const unstringOneRunWithOffset = `func %[1]sValue(name string) %[1]s {
+	for _, i := range _%[1]s_index {
+		if name == _%[1]s_name[_%[1]s_index[i]:_%[1]s_index[i+1]] {
+			return %[1]s(i + %[2]s)
+		}
+	}
+	panic("not a constant of %[1]s")
+}
+`
+
 
 // buildMultipleRuns generates the variables and String method for multiple runs of contiguous values.
 // For this pattern, a single Printf format won't do.
@@ -641,6 +664,23 @@ func (g *Generator) buildMultipleRuns(runs [][]Value, typeName string) {
 	}
 	g.Printf("\tdefault:\n")
 	g.Printf("\t\treturn \"%s(\" + strconv.FormatInt(int64(i), 10) + \")\"\n", typeName)
+	g.Printf("\t}\n")
+	g.Printf("}\n")
+
+	g.Printf("\n")
+	g.Printf("func %[1]sValue(name string) %[1]s {\n", typeName)
+	g.Printf("\tswitch name {\n")
+	for i, values := range runs {
+		if len(values) == 1 {
+			g.Printf("\tcase _%s_name_%d:\n", typeName, i)
+			g.Printf("\t\treturn %s(%s)\n", typeName, &values[0])
+			continue
+		} else {
+			g.Printf("\t// unsupported case %s to %s", &values[0], &values[len(values)-1])
+		}
+	}
+	g.Printf("\tdefault:\n")
+	g.Printf("\t\tpanic(\"not a constant of %s\")\n", typeName)
 	g.Printf("\t}\n")
 	g.Printf("}\n")
 }
